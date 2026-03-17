@@ -1,0 +1,21 @@
+services:
+  fuel-price-fetcher:
+    build: .
+    container_name: fuel-price-fetcher
+    restart: unless-stopped
+    environment:
+      - DB_HOST=${DB_HOST:-database}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-teslamate}
+      - DB_USER=${DB_USER:-teslamate}
+      - DB_PASS=${DB_PASS:-teslamate}
+      - SYNC_ON_START=${SYNC_ON_START:-true}
+      - SYNC_SINCE=${SYNC_SINCE:-2026-01-01}
+      - SCHEDULE_DAY=${SCHEDULE_DAY:-tuesday}
+      - SCHEDULE_TIME=${SCHEDULE_TIME:-15:00}
+    networks:
+      - teslamate_default
+
+networks:
+  teslamate_default:
+    external: true

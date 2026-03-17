@@ -1,0 +1,1683 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_TESLAMATE",
+      "label": "TeslaMate",
+      "description": "TeslaMate PostgreSQL datasource",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Compare EV running costs against equivalent gasoline vehicle costs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": [],
+      "title": "Summary",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  SUM(\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  ) as \"Total Savings\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Savings",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "blue",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  SUM(\n    GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  ) as \"EV Cost\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Total EV Cost",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "orange",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  SUM((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter) as \"Gasoline Cost\"\nFROM drives d\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Gasoline Equivalent",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "yellow",
+            "mode": "fixed"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT price_per_liter as \"Fuel Price\"\nFROM fuel_prices\nORDER BY week_start DESC\nLIMIT 1",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Fuel Price",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "description": "Weighted avg EUR/kWh from actual charging costs. Falls back to the variable if no cost data is available.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "id": 6,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as \"EUR/kWh\"\nFROM charging_processes\nWHERE car_id = ${car_id}\n  AND cost IS NOT NULL\n  AND charge_energy_added > 0",
+          "refId": "A"
+        }
+      ],
+      "title": "Electricity Price",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "purple",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 18,
+        "y": 1
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT COUNT(*) as \"Trips\"\nFROM drives\nWHERE car_id = ${car_id}\n  AND distance > 0\n  AND start_date >= $__timeFrom()\n  AND start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Trips",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "km"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 20,
+        "y": 1
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT ROUND(SUM(distance)::numeric, 1) as \"Distance\"\nFROM drives\nWHERE car_id = ${car_id}\n  AND distance > 0\n  AND start_date >= $__timeFrom()\n  AND start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Distance",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 2,
+        "x": 22,
+        "y": 1
+      },
+      "id": 9,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  AVG(\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  ) as \"Avg Savings\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Savings/Trip",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 10,
+      "panels": [],
+      "title": "Trip Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Date"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 140
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Route"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Drive Details",
+                    "url": "/d/zm7wN6Zgz/drive-details?var-drive_id=${__data.fields.drive_id}&var-car_id=${car_id}&from=${__data.fields.from}&to=${__data.fields.to}&timezone=browser&var-temp_unit=C&var-length_unit=km&var-alternative_length_unit=m&var-preferred_range=rated&var-pressure_unit=bar&var-speed_unit=km%2Fh"
+                  }
+                ]
+              },
+              {
+                "id": "custom.width"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "drive_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "from"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "to"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Distance"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "km"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "kWh Used"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Wh/km"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.width",
+                "value": 70
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EV Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyEUR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gas Cost"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyEUR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Savings"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "currencyEUR"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": 0
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fuel Price"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "include",
+                "names": ["EV Cost", "Gas Cost", "Savings"]
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.footer.reducers",
+                "value": ["sum"]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "enablePagination": false,
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Distance"
+          }
+        ]
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  TO_CHAR(d.start_date AT TIME ZONE 'Europe/Rome', 'DD/MM/YY HH24:MI') as \"Date\",\n  COALESCE(sg.name, sa.name, 'Unknown') || ' → ' || COALESCE(eg.name, ea.name, 'Unknown') as \"Route\",\n  d.id as \"drive_id\",\n  TO_CHAR(d.start_date AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"from\",\n  TO_CHAR(COALESCE(d.end_date, d.start_date + interval '1 hour') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"to\",\n  ROUND(d.distance::numeric, 1) as \"Distance\",\n  ROUND(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0)::numeric, 2) as \"kWh Used\",\n  CASE WHEN d.distance > 0\n    THEN ROUND((GREATEST(d.start_rated_range_km - d.end_rated_range_km, 0) * c.efficiency * 1000 / d.distance)::numeric, 0)\n    ELSE 0\n  END as \"Wh/km\",\n  ROUND((GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh)::numeric, 2) as \"EV Cost\",\n  ROUND(((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter)::numeric, 2) as \"Gas Cost\",\n  ROUND((\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  )::numeric, 2) as \"Savings\",\n  fp.price_per_liter as \"Fuel Price\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nLEFT JOIN addresses sa ON d.start_address_id = sa.id\nLEFT JOIN addresses ea ON d.end_address_id = ea.id\nLEFT JOIN geofences sg ON d.start_geofence_id = sg.id\nLEFT JOIN geofences eg ON d.end_geofence_id = eg.id\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()\nORDER BY d.start_date DESC",
+          "refId": "A"
+        }
+      ],
+      "title": "Trip by Trip Comparison",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 12,
+      "panels": [],
+      "title": "Weekly & Monthly",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EV Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gas Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Savings"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "id": 13,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": -45,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  TO_CHAR(date_trunc('week', d.start_date AT TIME ZONE 'Europe/Rome'), 'DD/MM') as \"Week\",\n  ROUND(SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh)::numeric, 2) as \"EV Cost\",\n  ROUND(SUM((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter)::numeric, 2) as \"Gas Cost\",\n  ROUND(SUM(\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  )::numeric, 2) as \"Savings\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()\nGROUP BY date_trunc('week', d.start_date AT TIME ZONE 'Europe/Rome')\nORDER BY date_trunc('week', d.start_date AT TIME ZONE 'Europe/Rome')",
+          "refId": "A"
+        }
+      ],
+      "title": "Weekly Comparison",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EV Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Gas Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Savings"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 14,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.8,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  TO_CHAR(date_trunc('month', d.start_date AT TIME ZONE 'Europe/Rome'), 'Mon YYYY') as \"Month\",\n  ROUND(SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh)::numeric, 2) as \"EV Cost\",\n  ROUND(SUM((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter)::numeric, 2) as \"Gas Cost\",\n  ROUND(SUM(\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  )::numeric, 2) as \"Savings\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()\nGROUP BY date_trunc('month', d.start_date AT TIME ZONE 'Europe/Rome')\nORDER BY date_trunc('month', d.start_date AT TIME ZONE 'Europe/Rome')",
+          "refId": "A"
+        }
+      ],
+      "title": "Monthly Comparison",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 15,
+      "panels": [],
+      "title": "Cumulative Savings",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "scheme",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cumulative EV Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cumulative Gas Cost"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Cumulative Savings"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "time_series",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n),\ndrive_costs AS (\n  SELECT\n    d.start_date as time,\n    GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh as ev_cost,\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter as gas_cost\n  FROM drives d\n  JOIN cars c ON c.id = d.car_id\n  CROSS JOIN elec e\n  JOIN LATERAL (\n    SELECT price_per_liter FROM fuel_prices\n    WHERE week_start <= d.start_date::date\n    ORDER BY week_start DESC LIMIT 1\n  ) fp ON true\n  WHERE d.car_id = ${car_id}\n    AND d.distance > 0\n    AND d.start_date >= $__timeFrom()\n    AND d.start_date <= $__timeTo()\n)\nSELECT\n  time,\n  SUM(ev_cost) OVER (ORDER BY time) as \"Cumulative EV Cost\",\n  SUM(gas_cost) OVER (ORDER BY time) as \"Cumulative Gas Cost\",\n  SUM(gas_cost - ev_cost) OVER (ORDER BY time) as \"Cumulative Savings\"\nFROM drive_costs\nORDER BY time",
+          "refId": "A"
+        }
+      ],
+      "title": "Cumulative Savings Over Time",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "id": 17,
+      "panels": [],
+      "title": "Fuel Price History",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 43
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  week_start::timestamptz as time,\n  price_per_liter as \"EUR/L\"\nFROM fuel_prices\nWHERE week_start >= $__timeFrom()::date\n  AND week_start <= $__timeTo()::date\nORDER BY week_start",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Fuel Price Trend",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "${DS_TESLAMATE}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "footer": {
+              "reducers": []
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Min"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "id": 19,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Week"
+          }
+        ]
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "${DS_TESLAMATE}"
+          },
+          "format": "table",
+          "rawSql": "SELECT\n  TO_CHAR(week_start, 'DD/MM/YYYY') as \"Week\",\n  price_per_liter as \"Price\",\n  price_min as \"Min\",\n  price_max as \"Max\",\n  station_count as \"Stations\",\n  source as \"Source\"\nFROM fuel_prices\nORDER BY week_start DESC\nLIMIT 20",
+          "refId": "A"
+        }
+      ],
+      "title": "Fuel Price History",
+      "type": "table"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": ["tesla", "teslamate", "ev", "savings"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "${DS_TESLAMATE}"
+        },
+        "label": "Car",
+        "name": "car_id",
+        "options": [],
+        "query": "SELECT id AS __value, name AS __text FROM cars ORDER BY id",
+        "refresh": 1,
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "7",
+          "value": "7"
+        },
+        "label": "ICE Consumption (L/100km)",
+        "name": "ice_consumption",
+        "options": [
+          {
+            "selected": true,
+            "text": "7",
+            "value": "7"
+          }
+        ],
+        "query": "7",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "0.25",
+          "value": "0.25"
+        },
+        "description": "Used only when charging cost data is not available in TeslaMate",
+        "label": "Elec. Price Fallback (EUR/kWh)",
+        "name": "electricity_price",
+        "options": [
+          {
+            "selected": true,
+            "text": "0.25",
+            "value": "0.25"
+          }
+        ],
+        "query": "0.25",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now/y",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "EV vs Gasoline Savings",
+  "uid": "ev-savings",
+  "version": 2,
+  "weekStart": ""
+}
