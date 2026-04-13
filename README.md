@@ -66,9 +66,9 @@ Importa la dashboard in Grafana: *Grafana > Dashboards > Import > carica* `grafa
 
 ### 5. Importazione della Dashboard
 
-1. Aprire**Grafana**.
-2. Andare su**Dashboards** ->**New** ->**Import**.
-3. Caricare il file`ev_savings_dashboard.json`.
+1. Aprire **Grafana**.
+2. Andare su **Dashboards** -> **New** -> **Import**.
+3. Caricare il file `ev_savings_dashboard.json`.
 4. Selezionare il data source di TeslaMate (PostgreSQL).
 
 ## Configurazione Dashboard
@@ -84,7 +84,7 @@ Il sistema non usa una media fissa. Per ogni viaggio salvato nel database:
 
 1. Recupera i kWh consumati da Teslamate.
 2. Calcola il costo elettrico medio basandosi sulle ricariche reali.
-3. Usa il prezzo della benzina della settimana corrente per calcolare quanto sarebbe costato fare lo stesso viaggio con un'auto a benzina.
+3. Usa il prezzo della benzina di quella specifica settimana per calcolare quanto sarebbe costato fare lo stesso viaggio con un'auto a benzina.
 4. Calcola il costo "evitato" della benzina e genera il risparmio netto.
 
 ---
