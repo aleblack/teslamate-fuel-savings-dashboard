@@ -37,7 +37,35 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "links": [],
+  "links": [
+    {
+      "icon": "dashboard",
+      "tags": [],
+      "title": "TeslaMate",
+      "tooltip": "",
+      "type": "link",
+      "url": "${base_url:raw}"
+    },
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "tags": ["tesla"],
+      "title": "Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": ["TeslamateCustomDashboards"],
+      "targetBlank": false,
+      "title": "Custom Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
   "panels": [
     {
       "collapsed": false,
@@ -630,12 +658,30 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "Date"
+              "options": "start_date_ts"
             },
             "properties": [
               {
+                "id": "displayName",
+                "value": "Date"
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              },
+              {
                 "id": "custom.width",
-                "value": 140
+                "value": 210
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "targetBlank": false,
+                    "title": "View drive details",
+                    "url": "/d/zm7wN6Zgz/drive-details?from=${__data.fields.start_date_ts.numeric}&to=${__data.fields.end_date_ts.numeric}&var-car_id=${__data.fields.car_id.numeric}&var-drive_id=${__data.fields.drive_id.numeric}"
+                  }
+                ]
               }
             ]
           },
@@ -687,6 +733,18 @@
             "matcher": {
               "id": "byName",
               "options": "to"
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom.viz",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*_ts/"
             },
             "properties": [
               {
@@ -920,7 +978,7 @@
             "uid": "${DS_TESLAMATE}"
           },
           "format": "table",
-          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  TO_CHAR(d.start_date AT TIME ZONE 'Europe/Rome', 'DD/MM/YY HH24:MI') as \"Date\",\n  COALESCE(sg.name, sa.name, 'Unknown') || ' → ' || COALESCE(eg.name, ea.name, 'Unknown') as \"Route\",\n  d.id as \"drive_id\",\n  TO_CHAR(d.start_date AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"from\",\n  TO_CHAR(COALESCE(d.end_date, d.start_date + interval '1 hour') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"to\",\n  ROUND(d.distance::numeric, 1) as \"Distance\",\n  ROUND(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0)::numeric, 2) as \"kWh Used\",\n  CASE WHEN d.distance > 0\n    THEN ROUND((GREATEST(d.start_rated_range_km - d.end_rated_range_km, 0) * c.efficiency * 1000 / d.distance)::numeric, 0)\n    ELSE 0\n  END as \"Wh/km\",\n  ROUND((GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh)::numeric, 2) as \"EV Cost\",\n  ROUND(((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter)::numeric, 2) as \"Gas Cost\",\n  ROUND((\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  )::numeric, 2) as \"Savings\",\n  fp.price_per_liter as \"Fuel Price\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nLEFT JOIN addresses sa ON d.start_address_id = sa.id\nLEFT JOIN addresses ea ON d.end_address_id = ea.id\nLEFT JOIN geofences sg ON d.start_geofence_id = sg.id\nLEFT JOIN geofences eg ON d.end_geofence_id = eg.id\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()\nORDER BY d.start_date DESC",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(\n    SUM(cost) / NULLIF(SUM(charge_energy_added), 0),\n    ${electricity_price}::numeric\n  ) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id}\n    AND cost IS NOT NULL\n    AND charge_energy_added > 0\n)\nSELECT\n  floor(extract(epoch FROM d.start_date AT TIME ZONE 'Europe/Rome')) * 1000 AS \"start_date_ts\",\n  floor(extract(epoch FROM COALESCE(d.end_date, d.start_date + interval '1 hour'))) * 1000 AS \"end_date_ts\",\n  COALESCE(sg.name, sa.name, 'Unknown') || ' → ' || COALESCE(eg.name, ea.name, 'Unknown') as \"Route\",\n  d.id as \"drive_id\",\n  TO_CHAR(d.start_date AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"from\",\n  TO_CHAR(COALESCE(d.end_date, d.start_date + interval '1 hour') AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.000\"Z\"') as \"to\",\n  ROUND(d.distance::numeric, 1) as \"Distance\",\n  ROUND(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0)::numeric, 2) as \"kWh Used\",\n  CASE WHEN d.distance > 0\n    THEN ROUND((GREATEST(d.start_rated_range_km - d.end_rated_range_km, 0) * c.efficiency * 1000 / d.distance)::numeric, 0)\n    ELSE 0\n  END as \"Wh/km\",\n  ROUND((GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh)::numeric, 2) as \"EV Cost\",\n  ROUND(((d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter)::numeric, 2) as \"Gas Cost\",\n  ROUND((\n    (d.distance / 100.0) * ${ice_consumption} * fp.price_per_liter\n    - GREATEST((d.start_rated_range_km - d.end_rated_range_km) * c.efficiency, 0) * e.price_per_kwh\n  )::numeric, 2) as \"Savings\",\n  fp.price_per_liter as \"Fuel Price\"\nFROM drives d\nJOIN cars c ON c.id = d.car_id\nCROSS JOIN elec e\nLEFT JOIN addresses sa ON d.start_address_id = sa.id\nLEFT JOIN addresses ea ON d.end_address_id = ea.id\nLEFT JOIN geofences sg ON d.start_geofence_id = sg.id\nLEFT JOIN geofences eg ON d.end_geofence_id = eg.id\nJOIN LATERAL (\n  SELECT price_per_liter FROM fuel_prices\n  WHERE week_start <= d.start_date::date\n  ORDER BY week_start DESC LIMIT 1\n) fp ON true\nWHERE d.car_id = ${car_id}\n  AND d.distance > 0\n  AND d.start_date >= $__timeFrom()\n  AND d.start_date <= $__timeTo()\nORDER BY d.start_date DESC",
           "refId": "A"
         }
       ],
