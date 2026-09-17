@@ -4,6 +4,7 @@
 
 ### Added
 - Navigation links in dashboard header: TeslaMate home, Dashboards (tag `tesla`), Custom Dashboards (tag `TeslamateCustomDashboards`)
+- TCO dashboard (`grafana/ev_tco_dashboard.json`): depreciation, fuel/electricity, maintenance, insurance and road tax compared between the EV and an equivalent gasoline car, using `depreciation_curve` for current market value
 
 ### Fixed
 - Date column in trips table now sorts correctly and displays in local format instead of raw string

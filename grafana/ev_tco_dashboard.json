@@ -1,0 +1,573 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_TESLAMATE",
+      "label": "TeslaMate",
+      "description": "TeslaMate PostgreSQL datasource",
+      "type": "datasource",
+      "pluginId": "grafana-postgresql-datasource",
+      "pluginName": "PostgreSQL"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "datasource",
+      "id": "grafana-postgresql-datasource",
+      "name": "PostgreSQL",
+      "version": "1.0.0"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Total cost of ownership for the EV vs an equivalent gasoline car: depreciation, fuel/electricity, maintenance, insurance and road tax",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [
+    {
+      "icon": "dashboard",
+      "tags": [],
+      "title": "TeslaMate",
+      "tooltip": "",
+      "type": "link",
+      "url": "${base_url:raw}"
+    },
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "tags": [
+        "tesla"
+      ],
+      "title": "Dashboards",
+      "type": "dashboards"
+    },
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [
+        "TeslamateCustomDashboards"
+      ],
+      "targetBlank": false,
+      "title": "Custom Dashboards",
+      "tooltip": "",
+      "type": "dashboards",
+      "url": ""
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "panels": [],
+      "title": "TCO Summary",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "text", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH car AS (\n  SELECT c.model, c.marketing_name, c.efficiency,\n    EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as eta_anni\n  FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model, eta_anni,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\ndrive_agg AS (\n  SELECT COALESCE(SUM(d.distance), 0) as km_percorsi\n  FROM drives d\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n)\nSELECT\n  COALESCE(\n    (SELECT base_price * EXP(-coeff_age * (SELECT eta_anni FROM car) - coeff_km * ((SELECT km_percorsi FROM drive_agg) / 10000.0)) FROM curve),\n    NULLIF(${valore_mercato_manuale}::numeric, 0)\n  ) as \"Valore stimato attuale\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Valore stimato attuale",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "orange", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH car AS (\n  SELECT c.model, c.marketing_name,\n    EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as eta_anni\n  FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model, eta_anni,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\ndrive_agg AS (\n  SELECT COALESCE(SUM(d.distance), 0) as km_percorsi\n  FROM drives d\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n)\nSELECT\n  ${valore_contanti}::numeric - COALESCE(\n    (SELECT base_price * EXP(-coeff_age * (SELECT eta_anni FROM car) - coeff_km * ((SELECT km_percorsi FROM drive_agg) / 10000.0)) FROM curve),\n    NULLIF(${valore_mercato_manuale}::numeric, 0)\n  ) as \"Deprezzamento totale\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Deprezzamento totale",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "blue", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(SUM(cost) / NULLIF(SUM(charge_energy_added), 0), ${electricity_price}::numeric) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id} AND cost IS NOT NULL AND charge_energy_added > 0\n),\ncar AS (\n  SELECT c.model, c.marketing_name, c.efficiency,\n    EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as eta_anni\n  FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model, eta_anni,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\ndrive_agg AS (\n  SELECT\n    COALESCE(SUM(d.distance), 0) as km_percorsi,\n    COALESCE(SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * car.efficiency, 0)), 0) as kwh_totale\n  FROM drives d CROSS JOIN car\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n),\ntotals AS (\n  SELECT\n    (SELECT eta_anni FROM car) as eta_anni,\n    ${valore_contanti}::numeric - COALESCE(\n      (SELECT base_price * EXP(-coeff_age * (SELECT eta_anni FROM car) - coeff_km * ((SELECT km_percorsi FROM drive_agg) / 10000.0)) FROM curve),\n      NULLIF(${valore_mercato_manuale}::numeric, 0)\n    ) as deprezzamento,\n    (SELECT kwh_totale FROM drive_agg) * (SELECT price_per_kwh FROM elec) as costo_elettricita\n)\nSELECT\n  deprezzamento\n  + costo_elettricita\n  + eta_anni * ${manutenzione_ev_anno}::numeric\n  + eta_anni * ${assicurazione_annua}::numeric\n  + GREATEST(eta_anni - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric as \"TCO EV cumulativo\"\nFROM totals",
+          "refId": "A"
+        }
+      ],
+      "title": "TCO EV cumulativo",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH car AS (\n  SELECT c.model, c.marketing_name,\n    EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as eta_anni\n  FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model, eta_anni,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\ndrive_agg AS (\n  SELECT COALESCE(SUM(d.distance), 0) as km_percorsi\n  FROM drives d\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\nfuel_cost AS (\n  SELECT COALESCE(SUM((d.distance / 100.0) * ${consumo_ice_l100km} * fp.price_per_liter), 0) as costo_carburante_ice\n  FROM drives d\n  JOIN LATERAL (\n    SELECT price_per_liter FROM fuel_prices WHERE week_start <= d.start_date::date ORDER BY week_start DESC LIMIT 1\n  ) fp ON true\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n),\ntotals AS (\n  SELECT\n    (SELECT eta_anni FROM car) as eta_anni,\n    ${valore_contanti}::numeric - COALESCE(\n      (SELECT base_price * EXP(-coeff_age * (SELECT eta_anni FROM car) - coeff_km * ((SELECT km_percorsi FROM drive_agg) / 10000.0)) FROM curve),\n      NULLIF(${valore_mercato_manuale}::numeric, 0)\n    ) as deprezzamento,\n    (SELECT costo_carburante_ice FROM fuel_cost) as costo_carburante_ice\n)\nSELECT\n  deprezzamento\n  + costo_carburante_ice\n  + eta_anni * ${manutenzione_ice_anno}::numeric\n  + eta_anni * ${assicurazione_annua}::numeric\n  + GREATEST(eta_anni - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric as \"TCO ICE equivalente\"\nFROM totals",
+          "refId": "A"
+        }
+      ],
+      "title": "TCO ICE equivalente",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": 0 }, { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 7 },
+      "id": 6,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(SUM(cost) / NULLIF(SUM(charge_energy_added), 0), ${electricity_price}::numeric) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id} AND cost IS NOT NULL AND charge_energy_added > 0\n),\ncar AS (\n  SELECT c.efficiency FROM cars c WHERE c.id = ${car_id}\n),\ndrive_agg AS (\n  SELECT COALESCE(SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * car.efficiency, 0)), 0) as kwh_totale\n  FROM drives d CROSS JOIN car\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\nfuel_cost AS (\n  SELECT COALESCE(SUM((d.distance / 100.0) * ${consumo_ice_l100km} * fp.price_per_liter), 0) as costo_carburante_ice\n  FROM drives d\n  JOIN LATERAL (\n    SELECT price_per_liter FROM fuel_prices WHERE week_start <= d.start_date::date ORDER BY week_start DESC LIMIT 1\n  ) fp ON true\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n)\nSELECT\n  (SELECT costo_carburante_ice FROM fuel_cost)\n  + (EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400)) * ${manutenzione_ice_anno}::numeric\n  - (SELECT kwh_totale FROM drive_agg) * (SELECT price_per_kwh FROM elec)\n  - (EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400)) * ${manutenzione_ev_anno}::numeric as \"Risparmio netto (carburante + manutenzione)\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Risparmio netto (carburante + manutenzione)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "text", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "decimals": 1,
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 7 },
+      "id": 7,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "SELECT EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as \"Anni di possesso\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Anni di possesso",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "text", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "km",
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 7 },
+      "id": 8,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "SELECT COALESCE(SUM(distance), 0) as \"Km percorsi\"\nFROM drives\nWHERE car_id = ${car_id} AND distance > 0 AND start_date >= '${data_acquisto}'::timestamptz",
+          "refId": "A"
+        }
+      ],
+      "title": "Km percorsi",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "text", "mode": "fixed" },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 7 },
+      "id": 9,
+      "options": {
+        "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showPercentChange": false, "textMode": "auto", "wideLayout": true
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH car AS (\n  SELECT c.model, c.marketing_name FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n)\nSELECT\n  CASE WHEN EXISTS (\n    SELECT 1 FROM dep_version dv\n    JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ) THEN 'curva depreciation_curve' ELSE 'valore manuale' END as \"Fonte valore mercato\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Fonte valore mercato",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "id": 10,
+      "panels": [],
+      "title": "Andamento TCO nel tempo",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false, "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "",
+            "axisPlacement": "auto", "barAlignment": 0, "barWidthFactor": 0.6, "drawStyle": "line",
+            "fillOpacity": 10, "gradientMode": "none",
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
+            "insertNulls": false, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 5,
+            "scaleDistribution": { "type": "linear" }, "showPoints": "auto", "showValues": false,
+            "spanNulls": true, "stacking": { "group": "A", "mode": "none" },
+            "thresholdsStyle": { "mode": "off" }
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 }, { "color": "red", "value": 80 } ] },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "TCO EV" },
+            "properties": [ { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } } ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "TCO ICE equivalente" },
+            "properties": [ { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } } ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "tooltip": { "hideZeros": false, "mode": "multi", "sort": "none" }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "time_series",
+          "rawSql": "WITH weeks AS (\n  SELECT generate_series(date_trunc('week', '${data_acquisto}'::timestamptz), date_trunc('week', now()), interval '1 week') as week_start\n),\ncar AS (\n  SELECT c.model, c.marketing_name, c.efficiency FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\nelec AS (\n  SELECT COALESCE(SUM(cost) / NULLIF(SUM(charge_energy_added), 0), ${electricity_price}::numeric) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id} AND cost IS NOT NULL AND charge_energy_added > 0\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n),\nweekly_drive AS (\n  SELECT\n    date_trunc('week', d.start_date AT TIME ZONE 'Europe/Rome') as week_start,\n    SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * car.efficiency, 0)) as kwh,\n    SUM(d.distance) as km,\n    SUM((d.distance / 100.0) * ${consumo_ice_l100km} * fp.price_per_liter) as ice_fuel_cost\n  FROM drives d\n  CROSS JOIN car\n  JOIN LATERAL (\n    SELECT price_per_liter FROM fuel_prices WHERE week_start <= d.start_date::date ORDER BY week_start DESC LIMIT 1\n  ) fp ON true\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n  GROUP BY 1\n),\ncum AS (\n  SELECT\n    w.week_start,\n    GREATEST(EXTRACT(EPOCH FROM (w.week_start - '${data_acquisto}'::timestamptz)) / (365.25 * 86400), 0) as eta_anni_at_week,\n    SUM(COALESCE(wd.kwh, 0)) OVER (ORDER BY w.week_start) as kwh_cum,\n    SUM(COALESCE(wd.km, 0)) OVER (ORDER BY w.week_start) as km_cum,\n    SUM(COALESCE(wd.ice_fuel_cost, 0)) OVER (ORDER BY w.week_start) as ice_fuel_cost_cum\n  FROM weeks w\n  LEFT JOIN weekly_drive wd ON wd.week_start = w.week_start\n)\nSELECT\n  cum.week_start as time,\n  ROUND((\n    (${valore_contanti}::numeric - COALESCE((SELECT base_price * EXP(-coeff_age * cum.eta_anni_at_week - coeff_km * (cum.km_cum / 10000.0)) FROM curve), NULLIF(${valore_mercato_manuale}::numeric, 0)))\n    + cum.kwh_cum * (SELECT price_per_kwh FROM elec)\n    + cum.eta_anni_at_week * ${manutenzione_ev_anno}::numeric\n    + cum.eta_anni_at_week * ${assicurazione_annua}::numeric\n    + GREATEST(cum.eta_anni_at_week - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric\n  )::numeric, 2) as \"TCO EV\",\n  ROUND((\n    (${valore_contanti}::numeric - COALESCE((SELECT base_price * EXP(-coeff_age * cum.eta_anni_at_week - coeff_km * (cum.km_cum / 10000.0)) FROM curve), NULLIF(${valore_mercato_manuale}::numeric, 0)))\n    + cum.ice_fuel_cost_cum\n    + cum.eta_anni_at_week * ${manutenzione_ice_anno}::numeric\n    + cum.eta_anni_at_week * ${assicurazione_annua}::numeric\n    + GREATEST(cum.eta_anni_at_week - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric\n  )::numeric, 2) as \"TCO ICE equivalente\"\nFROM cum\nORDER BY cum.week_start",
+          "refId": "A"
+        }
+      ],
+      "title": "TCO EV vs ICE equivalente nel tempo",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 12,
+      "panels": [],
+      "title": "Breakdown costi",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "cellOptions": { "type": "color-text" }, "footer": { "reducers": [] }, "inspect": false },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": 0 } ] },
+          "unit": "currencyEUR",
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "TCO EV" },
+            "properties": [ { "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } } ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "TCO ICE equivalente" },
+            "properties": [ { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } } ]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+      "id": 13,
+      "options": { "cellHeight": "sm", "showHeader": true },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+          "format": "table",
+          "rawSql": "WITH elec AS (\n  SELECT COALESCE(SUM(cost) / NULLIF(SUM(charge_energy_added), 0), ${electricity_price}::numeric) as price_per_kwh\n  FROM charging_processes\n  WHERE car_id = ${car_id} AND cost IS NOT NULL AND charge_energy_added > 0\n),\ncar AS (\n  SELECT c.model, c.marketing_name, c.efficiency,\n    EXTRACT(EPOCH FROM (now() - '${data_acquisto}'::timestamptz)) / (365.25 * 86400) as eta_anni\n  FROM cars c WHERE c.id = ${car_id}\n),\ndep_version AS (\n  SELECT model, eta_anni,\n    CASE\n      WHEN model = 'Y' AND marketing_name = 'LR AWD' THEN 'long-range-awd'\n      WHEN model = 'Y' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'Y' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = '3' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = '3' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = '3' AND marketing_name = 'RWD' THEN 'standard-range'\n      WHEN model = 'S' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'S' AND marketing_name = 'Performance' THEN 'performance'\n      WHEN model = 'X' AND marketing_name = 'LR AWD' THEN 'long-range'\n      WHEN model = 'X' AND marketing_name = 'Performance' THEN 'performance'\n    END as version\n  FROM car\n),\ndrive_agg AS (\n  SELECT\n    COALESCE(SUM(d.distance), 0) as km_percorsi,\n    COALESCE(SUM(GREATEST((d.start_rated_range_km - d.end_rated_range_km) * car.efficiency, 0)), 0) as kwh_totale\n  FROM drives d CROSS JOIN car\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\nfuel_cost AS (\n  SELECT COALESCE(SUM((d.distance / 100.0) * ${consumo_ice_l100km} * fp.price_per_liter), 0) as costo_carburante_ice\n  FROM drives d\n  JOIN LATERAL (\n    SELECT price_per_liter FROM fuel_prices WHERE week_start <= d.start_date::date ORDER BY week_start DESC LIMIT 1\n  ) fp ON true\n  WHERE d.car_id = ${car_id} AND d.distance > 0 AND d.start_date >= '${data_acquisto}'::timestamptz\n),\ncurve AS (\n  SELECT dc.base_price, dc.coeff_age, dc.coeff_km\n  FROM dep_version dv\n  JOIN depreciation_curve dc ON dc.make = 'tesla' AND dc.model = dv.model AND dc.version = dv.version\n  ORDER BY dc.computed_at DESC LIMIT 1\n),\ntotals AS (\n  SELECT\n    (SELECT eta_anni FROM car) as eta_anni,\n    ${valore_contanti}::numeric - COALESCE(\n      (SELECT base_price * EXP(-coeff_age * (SELECT eta_anni FROM car) - coeff_km * ((SELECT km_percorsi FROM drive_agg) / 10000.0)) FROM curve),\n      NULLIF(${valore_mercato_manuale}::numeric, 0)\n    ) as deprezzamento,\n    (SELECT kwh_totale FROM drive_agg) * (SELECT price_per_kwh FROM elec) as costo_elettricita,\n    (SELECT costo_carburante_ice FROM fuel_cost) as costo_carburante_ice\n)\nSELECT\n  ROUND(deprezzamento::numeric, 2) as \"Deprezzamento (comune)\",\n  ROUND(costo_elettricita::numeric, 2) as \"Elettricita (EV)\",\n  ROUND(costo_carburante_ice::numeric, 2) as \"Carburante (ICE eq.)\",\n  ROUND((eta_anni * ${manutenzione_ev_anno}::numeric)::numeric, 2) as \"Manutenzione EV\",\n  ROUND((eta_anni * ${manutenzione_ice_anno}::numeric)::numeric, 2) as \"Manutenzione ICE\",\n  ROUND((eta_anni * ${assicurazione_annua}::numeric)::numeric, 2) as \"Assicurazione (comune)\",\n  ROUND((GREATEST(eta_anni - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric)::numeric, 2) as \"Bollo (comune)\",\n  ROUND((deprezzamento + costo_elettricita + eta_anni * ${manutenzione_ev_anno}::numeric + eta_anni * ${assicurazione_annua}::numeric + GREATEST(eta_anni - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric)::numeric, 2) as \"TCO EV\",\n  ROUND((deprezzamento + costo_carburante_ice + eta_anni * ${manutenzione_ice_anno}::numeric + eta_anni * ${assicurazione_annua}::numeric + GREATEST(eta_anni - ${anni_esenzione_bollo}::numeric, 0) * ${bollo_annuo}::numeric)::numeric, 2) as \"TCO ICE equivalente\"\nFROM totals",
+          "refId": "A"
+        }
+      ],
+      "title": "Breakdown costi (dall'acquisto a oggi)",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "id": 14,
+      "panels": [],
+      "title": "Note",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 34 },
+      "id": 15,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false, "showMiniMap": false },
+        "content": "**Assunzioni V1 di questa dashboard**\n\n- Valore attuale di mercato: preso da `depreciation_curve` (aggiornata dallo scraper `market-value-fetcher`); se non c'e ancora una riga per questo modello/versione, viene usato `valore_mercato_manuale` come fallback.\n- Deprezzamento e assunto identico per lo scenario EV e per lo scenario ICE equivalente: il confronto si concentra sulla differenza di carburante/elettricita e manutenzione.\n- Bollo, assicurazione e manutenzione sono impostati come variabili dashboard con valore fisso annuo (non storicizzati nel DB). Se cambiano nel tempo, aggiorna la variabile.\n- Bollo: esente per i primi `anni_esenzione_bollo` anni dall'acquisto, poi `bollo_annuo`/anno.\n- Compila `valore_contanti` e `data_acquisto` prima di leggere i pannelli: senza questi valori le query restituiscono errore.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.4.1",
+      "title": "Assunzioni e fonti dati",
+      "type": "text"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 42,
+  "tags": [
+    "tesla",
+    "teslamate",
+    "ev",
+    "tco",
+    "TeslamateCustomDashboards"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "grafana-postgresql-datasource", "uid": "${DS_TESLAMATE}" },
+        "label": "Car",
+        "name": "car_id",
+        "options": [],
+        "query": "SELECT id AS __value, name AS __text FROM cars ORDER BY id",
+        "refresh": 1,
+        "regexApplyTo": "value",
+        "type": "query"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "description": "Prezzo totale pagato per l'auto (contanti + finanziamento)",
+        "label": "Valore contanti pagato (EUR)",
+        "name": "valore_contanti",
+        "options": [],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "", "value": "" },
+        "description": "Data di acquisto, formato YYYY-MM-DD",
+        "label": "Data acquisto",
+        "name": "data_acquisto",
+        "options": [],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "7", "value": "7" },
+        "label": "Consumo ICE (L/100km)",
+        "name": "consumo_ice_l100km",
+        "options": [ { "selected": true, "text": "7", "value": "7" } ],
+        "query": "7",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "0.25", "value": "0.25" },
+        "description": "Usato solo se mancano i dati di costo ricarica in TeslaMate",
+        "label": "Elettricita fallback (EUR/kWh)",
+        "name": "electricity_price",
+        "options": [ { "selected": true, "text": "0.25", "value": "0.25" } ],
+        "query": "0.25",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "1382", "value": "1382" },
+        "label": "Assicurazione annua (EUR)",
+        "name": "assicurazione_annua",
+        "options": [ { "selected": true, "text": "1382", "value": "1382" } ],
+        "query": "1382",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "155", "value": "155" },
+        "description": "Bollo annuo dopo il periodo di esenzione",
+        "label": "Bollo annuo post-esenzione (EUR)",
+        "name": "bollo_annuo",
+        "options": [ { "selected": true, "text": "155", "value": "155" } ],
+        "query": "155",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "5", "value": "5" },
+        "description": "Anni di esenzione bollo dall'acquisto",
+        "label": "Anni esenzione bollo",
+        "name": "anni_esenzione_bollo",
+        "options": [ { "selected": true, "text": "5", "value": "5" } ],
+        "query": "5",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "0", "value": "0" },
+        "label": "Manutenzione EV annua (EUR)",
+        "name": "manutenzione_ev_anno",
+        "options": [ { "selected": true, "text": "0", "value": "0" } ],
+        "query": "0",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "400", "value": "400" },
+        "label": "Manutenzione ICE annua (EUR)",
+        "name": "manutenzione_ice_anno",
+        "options": [ { "selected": true, "text": "400", "value": "400" } ],
+        "query": "400",
+        "type": "textbox"
+      },
+      {
+        "current": { "text": "0", "value": "0" },
+        "description": "Usato solo se depreciation_curve non ha ancora una riga per questo modello/versione. 0 = non impostato",
+        "label": "Valore mercato manuale (EUR)",
+        "name": "valore_mercato_manuale",
+        "options": [ { "selected": true, "text": "0", "value": "0" } ],
+        "query": "0",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-3y", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "EV Total Cost of Ownership",
+  "uid": "ev-tco",
+  "version": 1,
+  "weekStart": ""
+}
