@@ -1,0 +1,9 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir pg8000 schedule numpy beautifulsoup4
+
+COPY fetch_market_value.py .
+
+CMD ["python3", "-u", "fetch_market_value.py"]

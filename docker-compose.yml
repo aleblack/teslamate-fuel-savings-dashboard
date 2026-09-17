@@ -16,6 +16,25 @@ services:
     networks:
       - teslamate_default
 
+  market-value-fetcher:
+    build:
+      context: .
+      dockerfile: Dockerfile.market
+    container_name: market-value-fetcher
+    restart: unless-stopped
+    environment:
+      - DB_HOST=${DB_HOST:-database}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-teslamate}
+      - DB_USER=${DB_USER:-teslamate}
+      - DB_PASS=${DB_PASS:-teslamate}
+      - FETCH_ON_START=${MARKET_FETCH_ON_START:-true}
+      - SCHEDULE_DAY=${MARKET_SCHEDULE_DAY:-monday}
+      - SCHEDULE_TIME=${MARKET_SCHEDULE_TIME:-09:00}
+      - PAGES_TO_FETCH=${MARKET_PAGES:-5}
+    networks:
+      - teslamate_default
+
 networks:
   teslamate_default:
     external: true
