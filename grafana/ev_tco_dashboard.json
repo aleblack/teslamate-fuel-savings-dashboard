@@ -313,7 +313,7 @@
       "options": {
         "colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto",
         "percentChangeColorMode": "standard",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/", "values": false },
         "showPercentChange": false, "textMode": "auto", "wideLayout": true
       },
       "pluginVersion": "12.4.1",
